@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow, nosnippet, noarchive">
+    <title>RuneQuest Combat Calculator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .icon-sword::before { content: "⚔️"; }
+        .icon-shield::before { content: "🛡️"; }
+        .icon-target::before { content: "🎯"; }
+        .icon-dice::before { content: "🎲"; }
+        .icon-skull::before { content: "💀"; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const RuneQuestCombatCalculator = () => {
+            // Character stats
+            const [character, setCharacter] = useState({
+                name: "Gareth Ironhand",
+                str: 16,
+                dex: 13,
+                con: 15,
+                siz: 14,
+                weaponSkill: 75,
+                weapon: 'sword',
+                damage: '1d8+1',
+                armor: {
+                    head: 3,
+                    leftArm: 2,
+                    rightArm: 2,
+                    chest: 4,
+                    abdomen: 4,
+                    leftLeg: 3,
+                    rightLeg: 3
+                }
+            });
+
+            // Combat state
+            const [combatState, setCombatState] = useState({
+                targetSkill: 75,
+                difficulty: 0, // modifier to skill
+                attackType: 'melee',
+                hitLocation: 'random'
+            });
+
+            // Hit location table
+            const hitLocations = {
+                1: { name: 'Right Leg', ap: character.armor.rightLeg, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                2: { name: 'Right Leg', ap: character.armor.rightLeg, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                3: { name: 'Right Leg', ap: character.armor.rightLeg, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                4: { name: 'Right Leg', ap: character.armor.rightLeg, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                5: { name: 'Left Leg', ap: character.armor.leftLeg, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                6: { name: 'Left Leg', ap: character.armor.leftLeg, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                7: { name: 'Left Leg', ap: character.armor.leftLeg, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                8: { name: 'Left Leg', ap: character.armor.leftLeg, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                9: { name: 'Abdomen', ap: character.armor.abdomen, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                10: { name: 'Abdomen', ap: character.armor.abdomen, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                11: { name: 'Chest', ap: character.armor.chest, hp: Math.ceil((character.str + character.siz) / 2 / 2) },
+                12: { name: 'Chest', ap: character.armor.chest, hp: Math.ceil((character.str + character.siz) / 2 / 2) },
+                13: { name: 'Left Arm', ap: character.armor.leftArm, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                14: { name: 'Left Arm', ap: character.armor.leftArm, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                15: { name: 'Right Arm', ap: character.armor.rightArm, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                16: { name: 'Right Arm', ap: character.armor.rightArm, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                17: { name: 'Left Arm', ap: character.armor.leftArm, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                18: { name: 'Right Arm', ap: character.armor.rightArm, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                19: { name: 'Head', ap: character.armor.head, hp: Math.ceil((character.str + character.siz) / 2 / 3) },
+                20: { name: 'Head', ap: character.armor.head, hp: Math.ceil((character.str + character.siz) / 2 / 3) }
+            };
+
+            // Weapons data
+            const weapons = {
+                sword: { name: 'Broadsword', damage: '1d8+1', category: 'melee' },
+                spear: { name: 'Spear', damage: '1d6+1', category: 'melee' },
+                axe: { name: 'Battle Axe', damage: '1d8+2', category: 'melee' },
+                bow: { name: 'Composite Bow', damage: '1d8+1', category: 'missile' },
+                javelin: { name: 'Javelin', damage: '1d6', category: 'missile' },
+                dagger: { name: 'Dagger', damage: '1d4+2', category: 'melee' }
+            };
+
+            // Calculate effective skill
+            const getEffectiveSkill = () => {
+                let skill = character.weaponSkill + combatState.difficulty;
+                return Math.max(5, Math.min(95, skill)); // Skills are bounded 5-95%
+            };
+
+            // Calculate damage bonus
+            const getDamageBonus = () => {
+                const total = character.str + character.siz;
+                if (total <= 24) return '0';
+                if (total <= 32) return '+1d4';
+                if (total <= 40) return '+1d6';
+                if (total <= 56) return '+2d6';
+                return '+3d6';
+            };
+
+            // Roll percentile dice
+            const rollD100 = () => Math.floor(Math.random() * 100) + 1;
+            const rollD20 = () => Math.floor(Math.random() * 20) + 1;
+
+            // Simulate damage roll
+            const rollDamage = (diceString) => {
+                // Simple damage simulation - in reality you'd parse the dice string properly
+                if (diceString.includes('1d8')) return Math.floor(Math.random() * 8) + 1;
+                if (diceString.includes('1d6')) return Math.floor(Math.random() * 6) + 1;
+                if (diceString.includes('1d4')) return Math.floor(Math.random() * 4) + 1;
+                return 1;
+            };
+
+            // Roll attack
+            const rollAttack = () => {
+                const skillRoll = rollD100();
+                const effectiveSkill = getEffectiveSkill();
+                const locationRoll = combatState.hitLocation === 'random' ? rollD20() : parseInt(combatState.hitLocation);
+                const location = hitLocations[locationRoll];
+                
+                let result = 'miss';
+                let special = false;
+                
+                if (skillRoll <= effectiveSkill) {
+                    result = 'hit';
+                    // Critical hit on 01-05 or if roll is 1/20th of skill
+                    if (skillRoll <= 5 || skillRoll <= effectiveSkill / 20) {
+                        result = 'critical';
+                        special = true;
+                    }
+                } else {
+                    // Fumble on 96-00 or if skill is very low
+                    if (skillRoll >= 96) {
+                        result = 'fumble';
+                        special = true;
+                    }
+                }
+
+                // Calculate damage if hit
+                let totalDamage = 0;
+                let effectiveDamage = 0;
+                if (result === 'hit' || result === 'critical') {
+                    const baseDamage = rollDamage(weapons[character.weapon].damage);
+                    const bonusDamage = rollDamage(getDamageBonus());
+                    totalDamage = baseDamage + bonusDamage;
+                    
+                    if (result === 'critical') {
+                        totalDamage = Math.max(totalDamage, location.hp); // Critical always does max damage
+                    }
+                    
+                    effectiveDamage = Math.max(0, totalDamage - location.ap);
+                }
+
+                return {
+                    skillRoll,
+                    effectiveSkill,
+                    result,
+                    special,
+                    location,
+                    locationRoll,
+                    totalDamage,
+                    effectiveDamage,
+                    armorStopped: totalDamage - effectiveDamage
+                };
+            };
+
+            const [lastRoll, setLastRoll] = useState(null);
+
+            const handleAttack = () => {
+                const result = rollAttack();
+                setLastRoll(result);
+            };
+
+            // Get result color
+            const getResultColor = (result) => {
+                switch (result) {
+                    case 'critical': return 'text-yellow-600 bg-yellow-100';
+                    case 'hit': return 'text-green-600 bg-green-100';
+                    case 'fumble': return 'text-red-600 bg-red-100';
+                    default: return 'text-gray-600 bg-gray-100';
+                }
+            };
+
+            return (
+                <div className="max-w-5xl mx-auto p-6 bg-gradient-to-br from-red-50 to-orange-50 min-h-screen">
+                    <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                        <div className="flex items-center gap-3 mb-6">
+                            <span className="icon-sword text-3xl"></span>
+                            <h1 className="text-3xl font-bold text-red-800">RuneQuest Combat Calculator</h1>
+                        </div>
+                        
+                        {/* Character Info */}
+                        <div className="grid md:grid-cols-2 gap-6 mb-6">
+                            <div className="bg-red-50 p-4 rounded-lg">
+                                <h2 className="text-xl font-semibold text-red-800 mb-3">Character Info</h2>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                    <div><strong>Name:</strong> {character.name}</div>
+                                    <div><strong>STR:</strong> {character.str}</div>
+                                    <div><strong>DEX:</strong> {character.dex}</div>
+                                    <div><strong>CON:</strong> {character.con}</div>
+                                    <div><strong>SIZ:</strong> {character.siz}</div>
+                                    <div><strong>Damage Bonus:</strong> {getDamageBonus()}</div>
+                                </div>
+                            </div>
+                            
+                            <div className="bg-orange-50 p-4 rounded-lg">
+                                <h2 className="text-xl font-semibold text-orange-800 mb-3 flex items-center gap-2">
+                                    <span className="icon-shield"></span>
+                                    Armor Protection
+                                </h2>
+                                <div className="grid grid-cols-2 gap-1 text-xs">
+                                    <div><strong>Head:</strong> {character.armor.head} AP</div>
+                                    <div><strong>Chest:</strong> {character.armor.chest} AP</div>
+                                    <div><strong>L.Arm:</strong> {character.armor.leftArm} AP</div>
+                                    <div><strong>R.Arm:</strong> {character.armor.rightArm} AP</div>
+                                    <div><strong>Abdomen:</strong> {character.armor.abdomen} AP</div>
+                                    <div><strong>Legs:</strong> {character.armor.leftLeg} AP</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Combat Setup */}
+                        <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                            <h2 className="text-xl font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                                <span className="icon-target"></span>
+                                Combat Setup
+                            </h2>
+                            
+                            <div className="grid md:grid-cols-4 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Weapon</label>
+                                    <select 
+                                        value={character.weapon}
+                                        onChange={(e) => setCharacter({...character, weapon: e.target.value})}
+                                        className="w-full border rounded px-3 py-2"
+                                    >
+                                        {Object.entries(weapons).map(([key, weapon]) => (
+                                            <option key={key} value={key}>{weapon.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Weapon Skill %</label>
+                                    <input 
+                                        type="number" 
+                                        value={character.weaponSkill}
+                                        onChange={(e) => setCharacter({...character, weaponSkill: parseInt(e.target.value)})}
+                                        className="w-full border rounded px-3 py-2"
+                                        min="5" max="100"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Difficulty Modifier</label>
+                                    <select 
+                                        value={combatState.difficulty}
+                                        onChange={(e) => setCombatState({...combatState, difficulty: parseInt(e.target.value)})}
+                                        className="w-full border rounded px-3 py-2"
+                                    >
+                                        <option value={50}>Automatic (+50%)</option>
+                                        <option value={30}>Very Easy (+30%)</option>
+                                        <option value={20}>Easy (+20%)</option>
+                                        <option value={0}>Normal (0%)</option>
+                                        <option value={-20}>Hard (-20%)</option>
+                                        <option value={-30}>Very Hard (-30%)</option>
+                                        <option value={-50}>Impossible (-50%)</option>
+                                    </select>
+                                </div>
+                                
+                                <div>
+                                    <label className="block text-sm font-medium mb-1">Hit Location</label>
+                                    <select 
+                                        value={combatState.hitLocation}
+                                        onChange={(e) => setCombatState({...combatState, hitLocation: e.target.value})}
+                                        className="w-full border rounded px-3 py-2"
+                                    >
+                                        <option value="random">Random (1d20)</option>
+                                        <option value="19">Head</option>
+                                        <option value="15">Right Arm</option>
+                                        <option value="13">Left Arm</option>
+                                        <option value="11">Chest</option>
+                                        <option value="9">Abdomen</option>
+                                        <option value="1">Right Leg</option>
+                                        <option value="5">Left Leg</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Attack Summary */}
+                        <div className="bg-gray-50 p-4 rounded-lg mb-6">
+                            <h3 className="text-lg font-semibold mb-3">Attack Summary</h3>
+                            <div className="grid md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                    <strong>Weapon:</strong> {weapons[character.weapon].name}
+                                    <div className="text-xs text-gray-600">
+                                        Damage: {weapons[character.weapon].damage} + {getDamageBonus()}
+                                    </div>
+                                </div>
+                                <div>
+                                    <strong>Effective Skill:</strong> {getEffectiveSkill()}%
+                                    <div className="text-xs text-gray-600">
+                                        Base {character.weaponSkill}% {combatState.difficulty !== 0 ? `${combatState.difficulty > 0 ? '+' : ''}${combatState.difficulty}%` : ''}
+                                    </div>
+                                </div>
+                                <div>
+                                    <strong>Critical Range:</strong> 01-{Math.max(5, Math.floor(getEffectiveSkill() / 20))}
+                                    <div className="text-xs text-gray-600">
+                                        Fumble: 96-00
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Attack Button */}
+                        <div className="text-center mb-6">
+                            <button 
+                                onClick={handleAttack}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-colors flex items-center gap-2 mx-auto"
+                            >
+                                <span className="icon-dice"></span>
+                                Roll Attack (1d100)!
+                            </button>
+                        </div>
+
+                        {/* Attack Result */}
+                        {lastRoll && (
+                            <div className={`p-4 rounded-lg border-2 ${getResultColor(lastRoll.result)} border-current`}>
+                                <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+                                    {lastRoll.result === 'critical' && <span className="icon-dice">⚡</span>}
+                                    {lastRoll.result === 'hit' && <span className="icon-target">🎯</span>}
+                                    {lastRoll.result === 'fumble' && <span className="icon-skull">💀</span>}
+                                    {lastRoll.result === 'miss' && <span>❌</span>}
+                                    {lastRoll.result.toUpperCase()}
+                                    {lastRoll.special && ' (Special!)'}
+                                </h3>
+                                
+                                <div className="grid md:grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <div><strong>Skill Roll:</strong> {lastRoll.skillRoll}% (needed ≤{lastRoll.effectiveSkill}%)</div>
+                                        <div><strong>Hit Location:</strong> {lastRoll.location.name} (rolled {lastRoll.locationRoll})</div>
+                                        <div><strong>Location AP:</strong> {lastRoll.location.ap}</div>
+                                    </div>
+                                    
+                                    {(lastRoll.result === 'hit' || lastRoll.result === 'critical') && (
+                                        <div>
+                                            <div><strong>Total Damage:</strong> {lastRoll.totalDamage}</div>
+                                            <div><strong>Armor Stopped:</strong> {lastRoll.armorStopped}</div>
+                                            <div className="text-lg font-semibold mt-1">
+                                                <strong>Effective Damage:</strong> {lastRoll.effectiveDamage}
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    {lastRoll.result === 'fumble' && (
+                                        <div className="text-red-700">
+                                            <strong>Fumble!</strong> Roll on fumble table or lose next action.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Hit Location Chart */}
+                        <div className="mt-8 bg-slate-50 p-4 rounded-lg">
+                            <h3 className="text-lg font-semibold mb-3">Hit Location Reference (1d20)</h3>
+                            <div className="grid md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <div><strong>01-04:</strong> Right Leg</div>
+                                    <div><strong>05-08:</strong> Left Leg</div>
+                                    <div><strong>09-10:</strong> Abdomen</div>
+                                    <div><strong>11-12:</strong> Chest</div>
+                                </div>
+                                <div>
+                                    <div><strong>13-15:</strong> Left Arm</div>
+                                    <div><strong>16-18:</strong> Right Arm</div>
+                                    <div><strong>19-20:</strong> Head</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Character Customization */}
+                        <div className="mt-8 bg-slate-50 p-4 rounded-lg">
+                            <h3 className="text-lg font-semibold mb-3">Customize Character</h3>
+                            <div className="grid md:grid-cols-4 gap-3 text-sm">
+                                <div>
+                                    <label className="block font-medium">STR</label>
+                                    <input 
+                                        type="number" 
+                                        value={character.str}
+                                        onChange={(e) => setCharacter({...character, str: parseInt(e.target.value)})}
+                                        className="w-full border rounded px-2 py-1"
+                                        min="3" max="21"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-medium">SIZ</label>
+                                    <input 
+                                        type="number" 
+                                        value={character.siz}
+                                        onChange={(e) => setCharacter({...character, siz: parseInt(e.target.value)})}
+                                        className="w-full border rounded px-2 py-1"
+                                        min="3" max="21"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-medium">DEX</label>
+                                    <input 
+                                        type="number" 
+                                        value={character.dex}
+                                        onChange={(e) => setCharacter({...character, dex: parseInt(e.target.value)})}
+                                        className="w-full border rounded px-2 py-1"
+                                        min="3" max="21"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block font-medium">Name</label>
+                                    <input 
+                                        type="text" 
+                                        value={character.name}
+                                        onChange={(e) => setCharacter({...character, name: e.target.value})}
+                                        className="w-full border rounded px-2 py-1"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="mt-6 text-center text-xs text-gray-500">
+                            <p>RuneQuest Combat Calculator - For private use only</p>
+                            <p>Based on RuneQuest RPG mechanics by Chaosium Inc.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<RuneQuestCombatCalculator />, document.getElementById('root'));
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98be121cd8d5f0d6',t:'MTc2MDAxNDkyOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
